@@ -21,8 +21,11 @@ function writeString(instance, value) {
 
 function readCopiedString(instance, handle) {
   const length = instance.exports.workers_response_body_len(handle);
-  if (!length) {
+  if (length === 0) {
     return "";
+  }
+  if (length < 0) {
+    throw new Error("Swift Wasm returned an invalid negative response length");
   }
 
   const pointer = instance.exports.workers_alloc(length, WASM_ALIGNMENT);
