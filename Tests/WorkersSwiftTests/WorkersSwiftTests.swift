@@ -97,3 +97,27 @@ import Testing
 
     #expect(handle == 0)
 }
+
+@Test func wasmStoreFallsBackForOutOfRangeStatus() async throws {
+    let handle = WasmResponseStore.store(WorkerResponse(status: Int(Int32.max) + 1, body: "boom"))
+
+    #expect(workers_response_status(handle) == 500)
+    let bodyLength = workers_response_body_len(handle)
+    let bodyPointer = workers_alloc(bodyLength, 1)
+    #expect(bodyPointer != nil)
+
+    workers_response_body_copy(handle, bodyPointer)
+
+    let body = String(
+        decoding: UnsafeBufferPointer(
+            start: bodyPointer?.assumingMemoryBound(to: UInt8.self),
+            count: Int(bodyLength)
+        ),
+        as: UTF8.self
+    )
+
+    #expect(body == "Response status out of range for ABI")
+
+    workers_free(bodyPointer, bodyLength, 1)
+    workers_response_release(handle)
+}

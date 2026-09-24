@@ -59,10 +59,15 @@ enum WasmResponseStore {
                 status: 500,
                 body: Array("Response body too large for ABI".utf8)
             )
+        } else if let status = Int32(exactly: response.status) {
+            storedResponse = StoredWasmResponse(
+                status: status,
+                body: responseBytes
+            )
         } else {
             storedResponse = StoredWasmResponse(
-                status: Int32(response.status),
-                body: responseBytes
+                status: 500,
+                body: Array("Response status out of range for ABI".utf8)
             )
         }
 
@@ -153,7 +158,7 @@ func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
 #endif
 @_cdecl("workers_alloc")
 public func workers_alloc(_ size: Int32, _ alignment: Int32) -> UnsafeMutableRawPointer? {
-    guard size >= 0, alignment > 0, alignment.nonzeroBitCount == 1,
+    guard size >= 0, alignment == 1,
           let byteCount = Int(exactly: size),
           let byteAlignment = Int(exactly: alignment) else {
         return nil
