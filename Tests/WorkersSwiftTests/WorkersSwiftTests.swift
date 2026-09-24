@@ -87,3 +87,13 @@ import Testing
 @Test func wasmAllocatorRejectsInvalidAlignment() async throws {
     #expect(workers_alloc(4, 3) == nil)
 }
+
+@Test func wasmRequestRejectsNegativeLengths() async throws {
+    let method = Array("GET".utf8)
+
+    let handle = method.withUnsafeBufferPointer { methodBuffer in
+        workers_handle_request(methodBuffer.baseAddress, -1, nil, 0)
+    }
+
+    #expect(handle == 0)
+}

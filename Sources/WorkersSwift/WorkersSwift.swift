@@ -51,10 +51,20 @@ enum WasmResponseStore {
     nonisolated(unsafe) private static var responses: [Int32: StoredWasmResponse] = [:]
 
     static func store(_ response: WorkerResponse) -> Int32 {
-        let storedResponse = StoredWasmResponse(
-            status: Int32(response.status),
-            body: Array(response.body.utf8)
-        )
+        let responseBytes = Array(response.body.utf8)
+        let storedResponse: StoredWasmResponse
+
+        if responseBytes.count > Int(Int32.max) {
+            storedResponse = StoredWasmResponse(
+                status: 500,
+                body: Array("Response body too large for ABI".utf8)
+            )
+        } else {
+            storedResponse = StoredWasmResponse(
+                status: Int32(response.status),
+                body: responseBytes
+            )
+        }
 
         lock.lock()
         defer { lock.unlock() }
@@ -143,11 +153,13 @@ func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
 #endif
 @_cdecl("workers_alloc")
 public func workers_alloc(_ size: Int32, _ alignment: Int32) -> UnsafeMutableRawPointer? {
-    guard size >= 0, alignment > 0, alignment.nonzeroBitCount == 1 else {
+    guard size >= 0, alignment > 0, alignment.nonzeroBitCount == 1,
+          let byteCount = Int(exactly: size),
+          let byteAlignment = Int(exactly: alignment) else {
         return nil
     }
 
-    let pointer = UnsafeMutableRawPointer.allocate(byteCount: max(Int(size), 1), alignment: Int(alignment))
+    let pointer = UnsafeMutableRawPointer.allocate(byteCount: max(byteCount, 1), alignment: byteAlignment)
     WasmAllocationStore.record(pointer: pointer, size: size, alignment: alignment)
     return pointer
 }
