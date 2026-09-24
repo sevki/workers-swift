@@ -94,7 +94,9 @@ enum WasmResponseStore {
     static func bodyLength(for handle: Int32) -> Int32 {
         lock.lock()
         defer { lock.unlock() }
-        return Int32(responses[handle]?.body.count ?? 0)
+
+        let count = responses[handle]?.body.count ?? 0
+        return Int32(exactly: count) ?? Int32.max
     }
 
     static func copyBody(for handle: Int32, to destination: UnsafeMutableRawPointer?) {
