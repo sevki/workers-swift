@@ -12,7 +12,7 @@ function writeString(instance, value) {
     new Uint8Array(instance.exports.memory.buffer, pointer, bytes.length).set(bytes);
   }
 
-  return { pointer, length: bytes.length };
+  return { pointer, length: bytes.length, alignment: 1 };
 }
 
 function readCopiedString(instance, handle) {
@@ -27,7 +27,7 @@ function readCopiedString(instance, handle) {
     instance.exports.workers_response_body_copy(handle, pointer);
     return decoder.decode(new Uint8Array(instance.exports.memory.buffer, pointer, length));
   } finally {
-    instance.exports.workers_free(pointer);
+    instance.exports.workers_free(pointer, length, 1);
   }
 }
 
@@ -69,8 +69,8 @@ export function createWorkerHandler(importObject = globalThis.swiftWasmImportObj
           },
         });
       } finally {
-        instance.exports.workers_free(method.pointer);
-        instance.exports.workers_free(path.pointer);
+        instance.exports.workers_free(method.pointer, method.length, method.alignment);
+        instance.exports.workers_free(path.pointer, path.length, path.alignment);
 
         if (handle) {
           instance.exports.workers_response_release(handle);
@@ -80,4 +80,6 @@ export function createWorkerHandler(importObject = globalThis.swiftWasmImportObj
   };
 }
 
-export default createWorkerHandler();
+const defaultImportObject = globalThis.swiftWasmImportObject ?? {};
+
+export default createWorkerHandler(defaultImportObject);

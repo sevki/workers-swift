@@ -51,7 +51,7 @@ The JavaScript shim expects these WebAssembly exports:
 
 ## Using with workerd or celld
 
-Use `Examples/workerd-celld/worker.mjs` as the Worker entry point. The same module shape works for both runtimes because they both expose the standard Worker `fetch` interface and can instantiate bundled `.wasm` modules from JavaScript. The shim reads optional host imports from `globalThis.swiftWasmImportObject`, which lets you provide WASI or other runtime imports when your chosen Swift WebAssembly SDK needs them.
+Use `Examples/workerd-celld/worker.mjs` as the Worker entry point. The same module shape works for both runtimes because they both expose the standard Worker `fetch` interface and can instantiate bundled `.wasm` modules from JavaScript. The shim reads optional host imports from `globalThis.swiftWasmImportObject` once when the handler is created, which lets you provide WASI or other runtime imports when your chosen Swift WebAssembly SDK needs them.
 
 The default Swift routes are:
 

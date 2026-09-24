@@ -122,8 +122,12 @@ public func workers_alloc(_ size: Int32) -> UnsafeMutableRawPointer? {
 @_expose(wasm, "workers_free")
 #endif
 @_cdecl("workers_free")
-public func workers_free(_ pointer: UnsafeMutableRawPointer?) {
-    pointer?.deallocate()
+public func workers_free(_ pointer: UnsafeMutableRawPointer?, _ size: Int32, _ alignment: Int32) {
+    guard let pointer, size >= 0, alignment > 0 else {
+        return
+    }
+
+    pointer.deallocate()
 }
 
 #if arch(wasm32)
