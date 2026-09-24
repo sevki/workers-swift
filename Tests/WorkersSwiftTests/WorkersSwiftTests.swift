@@ -121,3 +121,7 @@ import Testing
     workers_free(bodyPointer, bodyLength, 1)
     workers_response_release(handle)
 }
+
+@Test func wasmHandleGenerationSkipsZeroOnWraparound() async throws {
+    #expect(WasmResponseStore.nextValidHandle(after: .max) == 1)
+}

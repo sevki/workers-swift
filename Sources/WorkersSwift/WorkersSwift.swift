@@ -50,6 +50,11 @@ enum WasmResponseStore {
     nonisolated(unsafe) private static var nextHandle: Int32 = 1
     nonisolated(unsafe) private static var responses: [Int32: StoredWasmResponse] = [:]
 
+    static func nextValidHandle(after handle: Int32) -> Int32 {
+        let next = handle &+ 1
+        return next > 0 ? next : 1
+    }
+
     static func store(_ response: WorkerResponse) -> Int32 {
         let responseBytes = Array(response.body.utf8)
         let storedResponse: StoredWasmResponse
@@ -74,8 +79,8 @@ enum WasmResponseStore {
         lock.lock()
         defer { lock.unlock() }
 
-        let handle = nextHandle
-        nextHandle &+= 1
+        let handle = nextHandle > 0 ? nextHandle : 1
+        nextHandle = nextValidHandle(after: handle)
         responses[handle] = storedResponse
         return handle
     }
