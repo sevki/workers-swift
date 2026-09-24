@@ -153,13 +153,13 @@ func hasValidABIString(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> Boo
     length == 0 || pointer != nil
 }
 
-func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
+func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String? {
     guard let pointer, length > 0 else {
         return ""
     }
 
     let buffer = UnsafeBufferPointer(start: pointer, count: Int(length))
-    return String(decoding: buffer, as: UTF8.self)
+    return String(bytes: buffer, encoding: .utf8)
 }
 
 #if arch(wasm32)
@@ -183,7 +183,7 @@ public func workers_alloc(_ size: Int32, _ alignment: Int32) -> UnsafeMutableRaw
 #endif
 @_cdecl("workers_free")
 public func workers_free(_ pointer: UnsafeMutableRawPointer?, _ size: Int32, _ alignment: Int32) {
-    guard let pointer, size >= 0, alignment > 0 else {
+    guard let pointer, size >= 0, alignment == 1 else {
         return
     }
     guard WasmAllocationStore.take(pointer: pointer, size: size, alignment: alignment) else {
@@ -205,13 +205,15 @@ public func workers_handle_request(
 ) -> Int32 {
     guard methodLength >= 0, pathLength >= 0,
           hasValidABIString(methodPointer, methodLength),
-          hasValidABIString(pathPointer, pathLength) else {
+          hasValidABIString(pathPointer, pathLength),
+          let method = decodeUTF8(methodPointer, methodLength),
+          let path = decodeUTF8(pathPointer, pathLength) else {
         return 0
     }
 
     let request = WorkerRequest(
-        method: decodeUTF8(methodPointer, methodLength),
-        path: decodeUTF8(pathPointer, pathLength)
+        method: method,
+        path: path
     )
 
     let response = WorkersSwiftApp.handle(request)

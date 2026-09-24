@@ -129,3 +129,13 @@ import Testing
 @Test func wasmRequestRejectsMissingPointerForPositiveLength() async throws {
     #expect(workers_handle_request(nil, 1, nil, 0) == 0)
 }
+
+@Test func wasmRequestRejectsInvalidUtf8() async throws {
+    let invalidMethod: [UInt8] = [0xFF]
+
+    let handle = invalidMethod.withUnsafeBufferPointer { methodBuffer in
+        workers_handle_request(methodBuffer.baseAddress, Int32(methodBuffer.count), nil, 0)
+    }
+
+    #expect(handle == 0)
+}
