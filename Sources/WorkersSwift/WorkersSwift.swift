@@ -1,3 +1,5 @@
+import Foundation
+
 public struct WorkerRequest: Sendable, Equatable {
     public let method: String
     public let path: String
@@ -33,39 +35,59 @@ public enum WorkersSwiftApp {
     }
 }
 
-enum WasmResponseBuffer {
-    nonisolated(unsafe) private static var pointer: UnsafeMutablePointer<UInt8>?
-    nonisolated(unsafe) private static var length: Int = 0
+private struct StoredWasmResponse {
+    let status: Int32
+    let body: [UInt8]
+}
 
-    static func replace(with body: String) {
-        reset()
+enum WasmResponseStore {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var nextHandle: Int32 = 1
+    nonisolated(unsafe) private static var responses: [Int32: StoredWasmResponse] = [:]
 
-        let bytes = Array(body.utf8)
-        guard !bytes.isEmpty else {
+    static func store(_ response: WorkerResponse) -> Int32 {
+        let storedResponse = StoredWasmResponse(
+            status: Int32(response.status),
+            body: Array(response.body.utf8)
+        )
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        let handle = nextHandle
+        nextHandle &+= 1
+        responses[handle] = storedResponse
+        return handle
+    }
+
+    static func status(for handle: Int32) -> Int32 {
+        lock.lock()
+        defer { lock.unlock() }
+        return responses[handle]?.status ?? 500
+    }
+
+    static func bodyLength(for handle: Int32) -> Int32 {
+        lock.lock()
+        defer { lock.unlock() }
+        return Int32(responses[handle]?.body.count ?? 0)
+    }
+
+    static func copyBody(for handle: Int32, to destination: UnsafeMutablePointer<UInt8>?) {
+        guard let destination else {
             return
         }
 
-        let newPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: bytes.count)
-        newPointer.initialize(from: bytes, count: bytes.count)
-        pointer = newPointer
-        length = bytes.count
+        lock.lock()
+        let body = responses[handle]?.body ?? []
+        lock.unlock()
+
+        destination.initialize(from: body, count: body.count)
     }
 
-    static func bodyPointer() -> UnsafePointer<UInt8>? {
-        guard let pointer else {
-            return nil
-        }
-        return UnsafePointer(pointer)
-    }
-
-    static func bodyLength() -> Int32 {
-        Int32(length)
-    }
-
-    private static func reset() {
-        pointer?.deallocate()
-        pointer = nil
-        length = 0
+    static func release(_ handle: Int32) {
+        lock.lock()
+        defer { lock.unlock() }
+        responses.removeValue(forKey: handle)
     }
 }
 
@@ -118,22 +140,37 @@ public func workers_handle_request(
     )
 
     let response = WorkersSwiftApp.handle(request)
-    WasmResponseBuffer.replace(with: response.body)
-    return Int32(response.status)
+    return WasmResponseStore.store(response)
 }
 
 #if arch(wasm32)
-@_expose(wasm, "workers_response_body_ptr")
+@_expose(wasm, "workers_response_status")
 #endif
-@_cdecl("workers_response_body_ptr")
-public func workers_response_body_ptr() -> UnsafePointer<UInt8>? {
-    WasmResponseBuffer.bodyPointer()
+@_cdecl("workers_response_status")
+public func workers_response_status(_ handle: Int32) -> Int32 {
+    WasmResponseStore.status(for: handle)
 }
 
 #if arch(wasm32)
 @_expose(wasm, "workers_response_body_len")
 #endif
 @_cdecl("workers_response_body_len")
-public func workers_response_body_len() -> Int32 {
-    WasmResponseBuffer.bodyLength()
+public func workers_response_body_len(_ handle: Int32) -> Int32 {
+    WasmResponseStore.bodyLength(for: handle)
+}
+
+#if arch(wasm32)
+@_expose(wasm, "workers_response_body_copy")
+#endif
+@_cdecl("workers_response_body_copy")
+public func workers_response_body_copy(_ handle: Int32, _ destination: UnsafeMutablePointer<UInt8>?) {
+    WasmResponseStore.copyBody(for: handle, to: destination)
+}
+
+#if arch(wasm32)
+@_expose(wasm, "workers_response_release")
+#endif
+@_cdecl("workers_response_release")
+public func workers_response_release(_ handle: Int32) {
+    WasmResponseStore.release(handle)
 }

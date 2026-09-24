@@ -5,9 +5,9 @@ const decoder = new TextDecoder();
 
 let instancePromise;
 
-async function loadInstance() {
+async function loadInstance(importObject) {
   if (!instancePromise) {
-    instancePromise = WebAssembly.instantiate(wasmModule, {});
+    instancePromise = WebAssembly.instantiate(wasmModule, importObject);
   }
 
   const { instance } = await instancePromise;
@@ -25,41 +25,58 @@ function writeString(instance, value) {
   return { pointer, length: bytes.length };
 }
 
-function readString(instance, pointer, length) {
-  if (!pointer || !length) {
+function readCopiedString(instance, handle) {
+  const length = instance.exports.workers_response_body_len(handle);
+  if (!length) {
     return "";
   }
 
-  return decoder.decode(new Uint8Array(instance.exports.memory.buffer, pointer, length));
+  const pointer = instance.exports.workers_alloc(length);
+
+  try {
+    instance.exports.workers_response_body_copy(handle, pointer);
+    return decoder.decode(new Uint8Array(instance.exports.memory.buffer, pointer, length));
+  } finally {
+    instance.exports.workers_free(pointer, length);
+  }
 }
 
-export default {
-  async fetch(request) {
-    const instance = await loadInstance();
-    const url = new URL(request.url);
-    const method = writeString(instance, request.method);
-    const path = writeString(instance, url.pathname);
+export function createWorkerHandler(importObject = globalThis.swiftWasmImportObject ?? {}) {
+  return {
+    async fetch(request) {
+      const instance = await loadInstance(importObject);
+      const url = new URL(request.url);
+      const method = writeString(instance, request.method);
+      const path = writeString(instance, url.pathname);
 
-    try {
-      const status = instance.exports.workers_handle_request(
-        method.pointer,
-        method.length,
-        path.pointer,
-        path.length,
-      );
-      const bodyPointer = instance.exports.workers_response_body_ptr();
-      const bodyLength = instance.exports.workers_response_body_len();
-      const body = readString(instance, bodyPointer, bodyLength);
+      let handle = 0;
 
-      return new Response(body, {
-        status,
-        headers: {
-          "content-type": "text/plain; charset=utf-8",
-        },
-      });
-    } finally {
-      instance.exports.workers_free(method.pointer, method.length);
-      instance.exports.workers_free(path.pointer, path.length);
-    }
-  },
-};
+      try {
+        handle = instance.exports.workers_handle_request(
+          method.pointer,
+          method.length,
+          path.pointer,
+          path.length,
+        );
+        const status = instance.exports.workers_response_status(handle);
+        const body = readCopiedString(instance, handle);
+
+        return new Response(body, {
+          status,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+          },
+        });
+      } finally {
+        instance.exports.workers_free(method.pointer, method.length);
+        instance.exports.workers_free(path.pointer, path.length);
+
+        if (handle) {
+          instance.exports.workers_response_release(handle);
+        }
+      }
+    },
+  };
+}
+
+export default createWorkerHandler();
