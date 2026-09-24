@@ -72,7 +72,7 @@ enum WasmResponseStore {
         return Int32(responses[handle]?.body.count ?? 0)
     }
 
-    static func copyBody(for handle: Int32, to destination: UnsafeMutablePointer<UInt8>?) {
+    static func copyBody(for handle: Int32, to destination: UnsafeMutableRawPointer?) {
         guard let destination else {
             return
         }
@@ -81,7 +81,13 @@ enum WasmResponseStore {
         let body = responses[handle]?.body ?? []
         lock.unlock()
 
-        destination.initialize(from: body, count: body.count)
+        guard !body.isEmpty else {
+            return
+        }
+
+        body.withUnsafeBytes { bytes in
+            destination.copyMemory(from: bytes.baseAddress!, byteCount: body.count)
+        }
     }
 
     static func release(_ handle: Int32) {
@@ -104,20 +110,19 @@ func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
 @_expose(wasm, "workers_alloc")
 #endif
 @_cdecl("workers_alloc")
-public func workers_alloc(_ size: Int32) -> UnsafeMutablePointer<UInt8>? {
+public func workers_alloc(_ size: Int32) -> UnsafeMutableRawPointer? {
     guard size >= 0 else {
         return nil
     }
 
-    let capacity = max(Int(size), 1)
-    return UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
+    return UnsafeMutableRawPointer.allocate(byteCount: max(Int(size), 1), alignment: 1)
 }
 
 #if arch(wasm32)
 @_expose(wasm, "workers_free")
 #endif
 @_cdecl("workers_free")
-public func workers_free(_ pointer: UnsafeMutablePointer<UInt8>?) {
+public func workers_free(_ pointer: UnsafeMutableRawPointer?) {
     pointer?.deallocate()
 }
 
@@ -160,7 +165,7 @@ public func workers_response_body_len(_ handle: Int32) -> Int32 {
 @_expose(wasm, "workers_response_body_copy")
 #endif
 @_cdecl("workers_response_body_copy")
-public func workers_response_body_copy(_ handle: Int32, _ destination: UnsafeMutablePointer<UInt8>?) {
+public func workers_response_body_copy(_ handle: Int32, _ destination: UnsafeMutableRawPointer?) {
     WasmResponseStore.copyBody(for: handle, to: destination)
 }
 
