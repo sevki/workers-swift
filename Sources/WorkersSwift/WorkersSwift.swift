@@ -105,6 +105,10 @@ func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
 #endif
 @_cdecl("workers_alloc")
 public func workers_alloc(_ size: Int32) -> UnsafeMutablePointer<UInt8>? {
+    guard size >= 0 else {
+        return nil
+    }
+
     let capacity = max(Int(size), 1)
     return UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
 }
@@ -113,7 +117,7 @@ public func workers_alloc(_ size: Int32) -> UnsafeMutablePointer<UInt8>? {
 @_expose(wasm, "workers_free")
 #endif
 @_cdecl("workers_free")
-public func workers_free(_ pointer: UnsafeMutablePointer<UInt8>?, _ size: Int32) {
+public func workers_free(_ pointer: UnsafeMutablePointer<UInt8>?) {
     pointer?.deallocate()
 }
 

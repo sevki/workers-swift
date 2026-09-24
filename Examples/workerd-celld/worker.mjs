@@ -27,7 +27,7 @@ function readCopiedString(instance, handle) {
     instance.exports.workers_response_body_copy(handle, pointer);
     return decoder.decode(new Uint8Array(instance.exports.memory.buffer, pointer, length));
   } finally {
-    instance.exports.workers_free(pointer, length);
+    instance.exports.workers_free(pointer);
   }
 }
 
@@ -69,8 +69,8 @@ export function createWorkerHandler(importObject = globalThis.swiftWasmImportObj
           },
         });
       } finally {
-        instance.exports.workers_free(method.pointer, method.length);
-        instance.exports.workers_free(path.pointer, path.length);
+        instance.exports.workers_free(method.pointer);
+        instance.exports.workers_free(path.pointer);
 
         if (handle) {
           instance.exports.workers_response_release(handle);
