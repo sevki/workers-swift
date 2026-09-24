@@ -2,17 +2,17 @@ import wasmModule from "./WorkersSwift.wasm";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-
+const WASM_ALIGNMENT = 1;
 
 function writeString(instance, value) {
   const bytes = encoder.encode(value);
-  const pointer = instance.exports.workers_alloc(bytes.length);
+  const pointer = instance.exports.workers_alloc(bytes.length, WASM_ALIGNMENT);
 
   if (bytes.length > 0) {
     new Uint8Array(instance.exports.memory.buffer, pointer, bytes.length).set(bytes);
   }
 
-  return { pointer, length: bytes.length, alignment: 1 };
+  return { pointer, length: bytes.length, alignment: WASM_ALIGNMENT };
 }
 
 function readCopiedString(instance, handle) {
@@ -21,17 +21,17 @@ function readCopiedString(instance, handle) {
     return "";
   }
 
-  const pointer = instance.exports.workers_alloc(length);
+  const pointer = instance.exports.workers_alloc(length, WASM_ALIGNMENT);
 
   try {
     instance.exports.workers_response_body_copy(handle, pointer);
     return decoder.decode(new Uint8Array(instance.exports.memory.buffer, pointer, length));
   } finally {
-    instance.exports.workers_free(pointer, length, 1);
+    instance.exports.workers_free(pointer, length, WASM_ALIGNMENT);
   }
 }
 
-export function createWorkerHandler(importObject = globalThis.swiftWasmImportObject ?? {}) {
+export function createWorkerHandler(importObject = {}) {
   let instancePromise;
 
   async function loadInstance() {

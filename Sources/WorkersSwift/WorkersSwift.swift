@@ -40,6 +40,11 @@ private struct StoredWasmResponse {
     let body: [UInt8]
 }
 
+private struct WasmAllocation {
+    let size: Int32
+    let alignment: Int32
+}
+
 enum WasmResponseStore {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var nextHandle: Int32 = 1
@@ -97,6 +102,33 @@ enum WasmResponseStore {
     }
 }
 
+enum WasmAllocationStore {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var allocations: [UInt: WasmAllocation] = [:]
+
+    static func record(pointer: UnsafeMutableRawPointer, size: Int32, alignment: Int32) {
+        lock.lock()
+        defer { lock.unlock() }
+        allocations[UInt(bitPattern: pointer)] = WasmAllocation(size: size, alignment: alignment)
+    }
+
+    static func take(pointer: UnsafeMutableRawPointer, size: Int32, alignment: Int32) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let key = UInt(bitPattern: pointer)
+        guard let allocation = allocations[key] else {
+            return false
+        }
+        guard allocation.size == size, allocation.alignment == alignment else {
+            return false
+        }
+
+        allocations.removeValue(forKey: key)
+        return true
+    }
+}
+
 func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
     guard let pointer, length > 0 else {
         return ""
@@ -110,12 +142,14 @@ func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
 @_expose(wasm, "workers_alloc")
 #endif
 @_cdecl("workers_alloc")
-public func workers_alloc(_ size: Int32) -> UnsafeMutableRawPointer? {
-    guard size >= 0 else {
+public func workers_alloc(_ size: Int32, _ alignment: Int32) -> UnsafeMutableRawPointer? {
+    guard size >= 0, alignment > 0 else {
         return nil
     }
 
-    return UnsafeMutableRawPointer.allocate(byteCount: max(Int(size), 1), alignment: 1)
+    let pointer = UnsafeMutableRawPointer.allocate(byteCount: max(Int(size), 1), alignment: Int(alignment))
+    WasmAllocationStore.record(pointer: pointer, size: size, alignment: alignment)
+    return pointer
 }
 
 #if arch(wasm32)
@@ -124,6 +158,9 @@ public func workers_alloc(_ size: Int32) -> UnsafeMutableRawPointer? {
 @_cdecl("workers_free")
 public func workers_free(_ pointer: UnsafeMutableRawPointer?, _ size: Int32, _ alignment: Int32) {
     guard let pointer, size >= 0, alignment > 0 else {
+        return
+    }
+    guard WasmAllocationStore.take(pointer: pointer, size: size, alignment: alignment) else {
         return
     }
 
