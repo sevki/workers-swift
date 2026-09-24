@@ -143,7 +143,7 @@ func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
 #endif
 @_cdecl("workers_alloc")
 public func workers_alloc(_ size: Int32, _ alignment: Int32) -> UnsafeMutableRawPointer? {
-    guard size >= 0, alignment > 0 else {
+    guard size >= 0, alignment > 0, alignment.nonzeroBitCount == 1 else {
         return nil
     }
 
@@ -177,6 +177,10 @@ public func workers_handle_request(
     _ pathPointer: UnsafePointer<UInt8>?,
     _ pathLength: Int32
 ) -> Int32 {
+    guard methodLength >= 0, pathLength >= 0 else {
+        return 0
+    }
+
     let request = WorkerRequest(
         method: decodeUTF8(methodPointer, methodLength),
         path: decodeUTF8(pathPointer, pathLength)

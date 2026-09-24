@@ -83,3 +83,7 @@ import Testing
     #expect(empty != nil)
     workers_free(empty, 0, 1)
 }
+
+@Test func wasmAllocatorRejectsInvalidAlignment() async throws {
+    #expect(workers_alloc(4, 3) == nil)
+}

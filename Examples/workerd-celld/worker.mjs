@@ -8,6 +8,10 @@ function writeString(instance, value) {
   const bytes = encoder.encode(value);
   const pointer = instance.exports.workers_alloc(bytes.length, WASM_ALIGNMENT);
 
+  if ((pointer === 0 || pointer == null) && bytes.length > 0) {
+    throw new Error("Swift Wasm allocation failed for request string");
+  }
+
   if (bytes.length > 0) {
     new Uint8Array(instance.exports.memory.buffer, pointer, bytes.length).set(bytes);
   }
@@ -22,6 +26,9 @@ function readCopiedString(instance, handle) {
   }
 
   const pointer = instance.exports.workers_alloc(length, WASM_ALIGNMENT);
+  if (pointer === 0 || pointer == null) {
+    throw new Error("Swift Wasm allocation failed for response body copy");
+  }
 
   try {
     instance.exports.workers_response_body_copy(handle, pointer);
