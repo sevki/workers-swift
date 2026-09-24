@@ -69,6 +69,9 @@ export function createWorkerHandler(importObject = {}) {
           path.pointer,
           path.length,
         );
+        if (handle === 0) {
+          throw new Error("Swift Wasm request bridge rejected malformed input");
+        }
         const status = instance.exports.workers_response_status(handle);
         const body = readCopiedString(instance, handle);
 
