@@ -3,16 +3,6 @@ import wasmModule from "./WorkersSwift.wasm";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-let instancePromise;
-
-async function loadInstance(importObject) {
-  if (!instancePromise) {
-    instancePromise = WebAssembly.instantiate(wasmModule, importObject);
-  }
-
-  const { instance } = await instancePromise;
-  return instance;
-}
 
 function writeString(instance, value) {
   const bytes = encoder.encode(value);
@@ -42,9 +32,20 @@ function readCopiedString(instance, handle) {
 }
 
 export function createWorkerHandler(importObject = globalThis.swiftWasmImportObject ?? {}) {
+  let instancePromise;
+
+  async function loadInstance() {
+    if (!instancePromise) {
+      instancePromise = WebAssembly.instantiate(wasmModule, importObject);
+    }
+
+    const { instance } = await instancePromise;
+    return instance;
+  }
+
   return {
     async fetch(request) {
-      const instance = await loadInstance(importObject);
+      const instance = await loadInstance();
       const url = new URL(request.url);
       const method = writeString(instance, request.method);
       const path = writeString(instance, url.pathname);

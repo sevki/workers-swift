@@ -22,3 +22,10 @@ import Testing
     #expect(response.status == 404)
     #expect(response.body == "Not Found")
 }
+
+@Test func lowercaseMethodStillMatchesRoute() async throws {
+    let response = WorkersSwiftApp.handle(.init(method: "get", path: "/health"))
+
+    #expect(response.status == 200)
+    #expect(response.body == "ok")
+}
