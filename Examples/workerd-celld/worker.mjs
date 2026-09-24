@@ -41,12 +41,22 @@ function readCopiedString(instance, handle) {
   }
 }
 
+async function instantiateModule(importObject) {
+  if (typeof wasmModule === "string" || wasmModule instanceof URL) {
+    const response = await fetch(wasmModule.toString());
+    const bytes = await response.arrayBuffer();
+    return WebAssembly.instantiate(bytes, importObject);
+  }
+
+  return WebAssembly.instantiate(wasmModule, importObject);
+}
+
 export function createWorkerHandler(importObject = {}) {
   let instancePromise;
 
   async function loadInstance() {
     if (!instancePromise) {
-      instancePromise = WebAssembly.instantiate(wasmModule, importObject).catch((error) => {
+      instancePromise = instantiateModule(importObject).catch((error) => {
         instancePromise = undefined;
         throw error;
       });

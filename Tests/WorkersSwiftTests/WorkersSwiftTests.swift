@@ -139,3 +139,7 @@ import Testing
 
     #expect(handle == 0)
 }
+
+@Test func wasmRequestRejectsMissingZeroLengthBuffers() async throws {
+    #expect(workers_handle_request(nil, 0, nil, 0) == 0)
+}
