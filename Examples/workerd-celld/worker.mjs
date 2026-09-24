@@ -43,7 +43,10 @@ export function createWorkerHandler(importObject = {}) {
 
   async function loadInstance() {
     if (!instancePromise) {
-      instancePromise = WebAssembly.instantiate(wasmModule, importObject);
+      instancePromise = WebAssembly.instantiate(wasmModule, importObject).catch((error) => {
+        instancePromise = undefined;
+        throw error;
+      });
     }
 
     const { instance } = await instancePromise;

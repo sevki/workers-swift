@@ -149,6 +149,10 @@ enum WasmAllocationStore {
     }
 }
 
+func hasValidABIString(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> Bool {
+    length == 0 || pointer != nil
+}
+
 func decodeUTF8(_ pointer: UnsafePointer<UInt8>?, _ length: Int32) -> String {
     guard let pointer, length > 0 else {
         return ""
@@ -199,7 +203,9 @@ public func workers_handle_request(
     _ pathPointer: UnsafePointer<UInt8>?,
     _ pathLength: Int32
 ) -> Int32 {
-    guard methodLength >= 0, pathLength >= 0 else {
+    guard methodLength >= 0, pathLength >= 0,
+          hasValidABIString(methodPointer, methodLength),
+          hasValidABIString(pathPointer, pathLength) else {
         return 0
     }
 

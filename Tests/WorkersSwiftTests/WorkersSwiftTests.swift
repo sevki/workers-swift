@@ -125,3 +125,7 @@ import Testing
 @Test func wasmHandleGenerationSkipsZeroOnWraparound() async throws {
     #expect(WasmResponseStore.nextValidHandle(after: .max) == 1)
 }
+
+@Test func wasmRequestRejectsMissingPointerForPositiveLength() async throws {
+    #expect(workers_handle_request(nil, 1, nil, 0) == 0)
+}
