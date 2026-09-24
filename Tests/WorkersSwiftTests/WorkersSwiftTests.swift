@@ -140,6 +140,10 @@ import Testing
     #expect(handle == 0)
 }
 
-@Test func wasmRequestRejectsMissingZeroLengthBuffers() async throws {
-    #expect(workers_handle_request(nil, 0, nil, 0) == 0)
+@Test func wasmRequestAllowsMissingZeroLengthBuffers() async throws {
+    let handle = workers_handle_request(nil, 0, nil, 0)
+
+    #expect(handle > 0)
+    #expect(workers_response_status(handle) == 404)
+    workers_response_release(handle)
 }

@@ -205,8 +205,7 @@ public func workers_handle_request(
     _ pathPointer: UnsafePointer<UInt8>?,
     _ pathLength: Int32
 ) -> Int32 {
-    guard let methodPointer, let pathPointer,
-          methodLength >= 0, pathLength >= 0,
+    guard methodLength >= 0, pathLength >= 0,
           hasValidABIString(methodPointer, methodLength),
           hasValidABIString(pathPointer, pathLength),
           let method = decodeUTF8(methodPointer, methodLength),
