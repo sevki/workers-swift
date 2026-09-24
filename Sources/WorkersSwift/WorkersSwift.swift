@@ -105,9 +105,9 @@ enum WasmResponseStore {
         }
 
         lock.lock()
-        defer { lock.unlock() }
+        let body = Array(responses[handle]?.body ?? [])
+        lock.unlock()
 
-        let body = responses[handle]?.body ?? []
         guard !body.isEmpty else {
             return
         }
