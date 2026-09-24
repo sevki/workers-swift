@@ -36,3 +36,50 @@ import Testing
     #expect(response.status == 404)
     #expect(response.body == "Not Found")
 }
+
+@Test func wasmRequestExportsRoundTripResponseBody() async throws {
+    let method = Array("GET".utf8)
+    let path = Array("/".utf8)
+
+    let handle = method.withUnsafeBufferPointer { methodBuffer in
+        path.withUnsafeBufferPointer { pathBuffer in
+            workers_handle_request(
+                methodBuffer.baseAddress,
+                Int32(methodBuffer.count),
+                pathBuffer.baseAddress,
+                Int32(pathBuffer.count)
+            )
+        }
+    }
+
+    #expect(workers_response_status(handle) == 200)
+    let bodyLength = workers_response_body_len(handle)
+    #expect(bodyLength == Int32("Hello from Swift on workerd/celld".utf8.count))
+
+    let bodyPointer = workers_alloc(bodyLength, 1)
+    #expect(bodyPointer != nil)
+
+    workers_response_body_copy(handle, bodyPointer)
+
+    let body = String(
+        decoding: UnsafeBufferPointer(
+            start: bodyPointer?.assumingMemoryBound(to: UInt8.self),
+            count: Int(bodyLength)
+        ),
+        as: UTF8.self
+    )
+
+    #expect(body == "Hello from Swift on workerd/celld")
+
+    workers_free(bodyPointer, bodyLength, 1)
+    workers_response_release(handle)
+    #expect(workers_response_status(handle) == 500)
+}
+
+@Test func wasmAllocatorRejectsNegativeSizesAndSupportsEmptyBuffers() async throws {
+    #expect(workers_alloc(-1, 1) == nil)
+
+    let empty = workers_alloc(0, 1)
+    #expect(empty != nil)
+    workers_free(empty, 0, 1)
+}
